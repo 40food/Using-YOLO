@@ -47,7 +47,7 @@ def unzip(zip_file=None):
             print("Exctracted all")
     except:
         print("Invalid file")
-unzip('hituav-a-highaltitude-infrared-thermal-dataset.zip')
+unzip('0329data.zip')
 
 #Dataset set up
 ROOT_DIR='hit-uav'
@@ -179,9 +179,9 @@ def plot(image_path,label_path,num_samples):
     plt.show()
 
 #몇 개의 training 이미지들을 시각화
-plot(image_path=os.path.join(ROOT_DIR,train_imgs_dir),
-     label_path=os.path.join(ROOT_DIR,train_labels_dir),
-     num_samples=4)
+# plot(image_path=os.path.join(ROOT_DIR,train_imgs_dir),
+#      label_path=os.path.join(ROOT_DIR,train_labels_dir),
+#      num_samples=4)
 
 #data preparation 데이터 준비
 train_data=coco_detection_yolo_format_train(
@@ -210,8 +210,8 @@ val_data=coco_detection_yolo_format_val(
 )
 
 # transforms and augmentations??
-train_data.dataset.transforms
-train_data.dataset.plot(plot_transformed_data=True)
+# train_data.dataset.transforms
+# train_data.dataset.plot(plot_transformed_data=True)
 
 # training parameter 정의
 train_params={
@@ -267,25 +267,50 @@ train_params={
 #training을 위한 모델
 models_to_train=[
     'yolo_nas_s',
-    'yolo_nas_m',
-    'yolo_nas_l'
+    # 'yolo_nas_m',
+    # 'yolo_nas_l'
 ]
 CHECKPOINT_DIR='checkpoints'
 
 #모델 training
-for model_to_train in models_to_train:
-    trainer=Trainer(
+def train():
+    for model_to_train in models_to_train:
+        trainer=Trainer(
         experiment_name=model_to_train,
         ckpt_root_dir=CHECKPOINT_DIR
-    )
-    model=models.get(
-        model_to_train,
-        num_classes=len(dataset_params['classes']),
-        pretrained_weights="coco"
-    )
-    trainer.train(
-        model=model,
-        training_params=train_params,
-        train_loader=train_data,
-        valid_loader=val_data
-    )
+        )
+        model=models.get(
+            model_to_train,
+            num_classes=len(dataset_params['classes']),
+            pretrained_weights="coco"
+        )
+        trainer.train(
+            model=model,
+            training_params=train_params,
+            train_loader=train_data,
+            valid_loader=val_data
+        )
+
+# if __name__ == '__main__':
+#     train()
+
+#result 확인 준비
+import torch
+os.makedirs('inference_result/images/',exist_ok=True)
+device=torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+model=models.get(
+    model_name='yolo_nas_s',
+    checkpoint_path='checkpoints/yolo_nas_s/RUN_20240331_071829_558616/ckpt_best.pth',
+    num_classes=5
+).to(device)
+#test image에 적용
+ROOT_TEST='hit-uav/images/test/'
+all_images=os.listdir(ROOT_TEST)
+for image in tqdm(all_images,total=len(all_images)):
+    image_path=os.path.join(ROOT_TEST,image)
+    out=model.predict(image_path)
+    out.save('inference_result/images','jpg')
+    os.rename(
+        'inference_result/images/pred_0.jpg',
+            os.path.join('inference_result/images/',image)
+        )
